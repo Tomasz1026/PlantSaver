@@ -11,8 +11,8 @@ interface PlantDao {
     suspend fun getAll(): List<Plant>
 
     @Insert
-    suspend fun insert(vararg favDrink: Plant)
+    suspend fun insert(vararg plant: Plant)
 
     @Delete
-    suspend fun delete(favDrinks: Plant)
+    suspend fun delete(plant: Plant)
 }

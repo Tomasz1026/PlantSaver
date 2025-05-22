@@ -56,39 +56,102 @@ import androidx.lifecycle.ViewModelProvider
 import kotlinx.coroutines.launch
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.room.Room
 import com.example.plantsaver.ui.theme.PlantSaverTheme
 
 class MainActivity : ComponentActivity() {
 
-
+    private val db by lazy {
+        Room.databaseBuilder(
+            applicationContext,
+            LocalDB::class.java, "local_db"
+        ).fallbackToDestructiveMigration(true).build()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val repository = PlantRepository(db)
+        val viewModelFactory = ViewModelFactory(repository)
+        val dataBaseViewModel = ViewModelProvider(this, viewModelFactory)[DataBaseViewModel::class.java]
+
         enableEdgeToEdge()
         setContent {
-
             PlantSaverTheme {
-                Scaffold(
-                    modifier = Modifier.fillMaxSize()
-                ) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
+                PlantSaver(dataBaseViewModel)
             }
         }
     }
 }
 
 @Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
+fun PlantSaver(dataBaseViewModel: DataBaseViewModel) {
+    val navController = rememberNavController()
     val weatherViewModel = viewModel<WeatherViewModel>()
+
+    weatherViewModel.getCurrentWeather()
+
+    val topLevelRoutes = listOf(
+        TopLevelRoute("Weather", "weather", ImageVector.vectorResource(R.drawable.ic_sun)),
+        TopLevelRoute("Plants", "plants", ImageVector.vectorResource(R.drawable.ic_flower))
+    )
+
+    Scaffold(
+        bottomBar =  {
+            NavigationBar {
+                val navBackStackEntry by navController.currentBackStackEntryAsState()
+                val currentDestination = navBackStackEntry?.destination
+
+                topLevelRoutes.forEach { topLevelRoute ->
+                    NavigationBarItem(
+                        icon = {
+                            Icon(topLevelRoute.icon, topLevelRoute.name)
+                        },
+                        label = {Text(topLevelRoute.name)},
+                        selected =  currentDestination?.route == topLevelRoute.route,
+                        onClick = {
+                            navController.navigate(topLevelRoute.route) {
+                                popUpTo(navController.graph.id) {
+                                    saveState = true
+                                    inclusive = true
+                                }
+
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
+                    )
+                }
+            }
+        }
+    ) { innerPadding->
+        NavHost(
+            navController = navController,
+            startDestination = "weather",
+            modifier = Modifier.padding(bottom=innerPadding.calculateBottomPadding())
+        ) {
+            composable("weather") {
+                Weather(
+                    weatherViewModel
+                )
+            }
+            composable("plants") {
+                Plants(dataBaseViewModel)
+            }
+        }
+    }
+}
+
+@Composable
+fun Weather(weatherViewModel: WeatherViewModel) {
+
     val weatherData by weatherViewModel.weatherData
 
     Scaffold(
@@ -99,26 +162,88 @@ fun Greeting(name: String, modifier: Modifier = Modifier) {
                 .padding(innerPadding)
                 .fillMaxSize(),
         ){
+                    Text(
+                        text = "Your location",
+                        modifier = Modifier
+                        .fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = weatherData?.location?.name.toString(),
+                        modifier = Modifier
+                            .fillMaxWidth(),
+                        style = TextStyle(
+                            fontSize = 30.sp
+                        ),
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = "${weatherData?.current?.temp_c.toString()}°C",
+                        modifier = Modifier
+                            .fillMaxWidth(),
+                        style = TextStyle(
+                            fontSize = 50.sp
+                        ),
+                        textAlign = TextAlign.Center
+                    )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
+            ){
+                Button(onClick = {
+                    weatherViewModel.getCurrentWeather()
+                }){
+                    Icon(Icons.Filled.Refresh, "Refresh")
+                }
+            }
 
-            Text(
-                text = weatherData?.current?.temp_c.toString(),
-                modifier = modifier
-            )
-            Button(onClick = {
-                weatherViewModel.getCurrentWeather()
-            }){
-                Icon(Icons.Filled.Refresh, "Refresh")
+
+
+
+        }
+    }
+}
+
+@Composable
+fun Plants(dataBaseViewModel: DataBaseViewModel) {
+
+    val plants by dataBaseViewModel.plants
+
+    Scaffold {
+        innerPadding->
+        Column(
+            modifier = Modifier.
+            padding(innerPadding)
+        ) {
+            Row() {
+                Spacer(Modifier.weight(1f))
+                Text("ID")
+                Spacer(Modifier.weight(1f))
+                Text("Nazwa")
+                Spacer(Modifier.weight(1f))
+                Text("Gatunek")
+                Spacer(Modifier.weight(1f))
+            }
+            LazyColumn(
+
+            ) {
+                items(plants) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                    ) {
+                        Spacer(Modifier.weight(1f))
+                        Text(it.plantId.toString())
+                        Spacer(Modifier.weight(1f))
+                        Text(it.plantName)
+                        Spacer(Modifier.weight(1f))
+                        Text(it.plantSpecies)
+                        Spacer(Modifier.weight(1f))
+                    }
+                }
             }
         }
     }
 
-
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    PlantSaverTheme {
-        Greeting("Android")
-    }
 }
