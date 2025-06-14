@@ -21,7 +21,7 @@ class DataBaseViewModel(private val repository: PlantRepository) : ViewModel() {
         }
     }
 
-    fun addDrink(plant: Plant) {
+    fun addPlant(plant: Plant) {
         viewModelScope.launch {
             repository.addPlant(plant)
         }

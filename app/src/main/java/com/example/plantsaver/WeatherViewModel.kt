@@ -10,12 +10,13 @@ class WeatherViewModel: ViewModel() {
     private val _weatherData = mutableStateOf<WeatherResponse?>(null)
     val weatherData: State<WeatherResponse?> = _weatherData
 
+    val apiKey = "71911e68ab6f4494991103240252205"
 
     fun getCurrentWeather() {
 
         viewModelScope.launch {
             try {
-                _weatherData.value = RetrofitInstance.api.getCurrentWeather("71911e68ab6f4494991103240252205", "Poznan", "no")
+                _weatherData.value = RetrofitInstance.api.getCurrentWeather(apiKey, "Poznan", "no")
 
             } catch(e: Exception) {
                 println(e)

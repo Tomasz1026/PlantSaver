@@ -65,6 +65,12 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.room.Room
 import com.example.plantsaver.ui.theme.PlantSaverTheme
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.Marker
+import com.google.maps.android.compose.rememberCameraPositionState
+import com.google.maps.android.compose.rememberMarkerState
 
 class MainActivity : ComponentActivity() {
 
@@ -153,7 +159,13 @@ fun PlantSaver(dataBaseViewModel: DataBaseViewModel) {
 fun Weather(weatherViewModel: WeatherViewModel) {
 
     val weatherData by weatherViewModel.weatherData
-
+/*
+    val singapore = LatLng(1.35, 103.87)
+    val singaporeMarkerState = rememberMarkerState(position = singapore)
+    val cameraPositionState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(singapore, 10f)
+    }
+*/
     Scaffold(
 
     ) { innerPadding ->
@@ -162,6 +174,16 @@ fun Weather(weatherViewModel: WeatherViewModel) {
                 .padding(innerPadding)
                 .fillMaxSize(),
         ){
+            /*GoogleMap(
+                modifier = Modifier.fillMaxSize(),
+                cameraPositionState = cameraPositionState
+            ) {
+                Marker(
+                    state = singaporeMarkerState,
+                    title = "Singapore",
+                    snippet = "Marker in Singapore"
+                )
+            }*/
                     Text(
                         text = "Your location",
                         modifier = Modifier
@@ -210,7 +232,13 @@ fun Plants(dataBaseViewModel: DataBaseViewModel) {
 
     val plants by dataBaseViewModel.plants
 
-    Scaffold {
+    Scaffold(
+        modifier = Modifier
+            .fillMaxSize(),
+        floatingActionButton = {
+            AddPlant()
+        }
+    ) {
         innerPadding->
         Column(
             modifier = Modifier.
@@ -229,7 +257,7 @@ fun Plants(dataBaseViewModel: DataBaseViewModel) {
 
             ) {
                 items(plants) {
-                    Row(
+                    Card(
                         modifier = Modifier
                             .fillMaxWidth()
                     ) {
@@ -246,4 +274,13 @@ fun Plants(dataBaseViewModel: DataBaseViewModel) {
         }
     }
 
+}
+
+@Composable
+fun AddPlant() {
+    FloatingActionButton(
+        onClick = {  },
+    ) {
+        Icon(painterResource(id = R.drawable.ic_add), "Floating action button.")
+    }
 }
