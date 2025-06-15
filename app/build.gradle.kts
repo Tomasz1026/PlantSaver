@@ -111,4 +111,14 @@ dependencies {
     implementation("com.google.android.gms:play-services-maps:19.0.0")
     //google maps compose
     implementation("com.google.maps.android:maps-compose:6.4.1")
+
+    //vico chart library
+    implementation(libs.vico.compose)
+    implementation(libs.vico.compose.m2)
+    implementation(libs.vico.compose.m3)
+    implementation(libs.vico.multiplatform)
+    implementation(libs.vico.views)
+
+    //google places api
+    implementation("com.google.android.libraries.places:places:3.0.0")
 }

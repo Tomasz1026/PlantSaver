@@ -5,6 +5,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -26,7 +27,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
@@ -57,20 +57,41 @@ import kotlinx.coroutines.launch
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.room.Room
+import com.example.plantsaver.BuildConfig.GOOGLE_MAPS_API_KEY
+import com.example.plantsaver.ui.theme.PlantDarkGreen
+import com.example.plantsaver.ui.theme.PlantGreen
 import com.example.plantsaver.ui.theme.PlantSaverTheme
+import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.MarkerOptions
+import com.google.android.libraries.places.api.Places
+import com.google.android.libraries.places.api.net.PlacesClient
 import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.MapProperties
+import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.google.maps.android.compose.rememberMarkerState
+import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
+import com.patrykandpatrick.vico.compose.cartesian.axis.rememberBottom
+import com.patrykandpatrick.vico.compose.cartesian.axis.rememberStart
+import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
+import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
+import com.patrykandpatrick.vico.core.cartesian.axis.HorizontalAxis
+import com.patrykandpatrick.vico.core.cartesian.axis.VerticalAxis
+import com.patrykandpatrick.vico.core.cartesian.data.CartesianChartModelProducer
+import com.patrykandpatrick.vico.core.cartesian.data.lineSeries
+import kotlinx.coroutines.runBlocking
 
 class MainActivity : ComponentActivity() {
 
@@ -81,8 +102,16 @@ class MainActivity : ComponentActivity() {
         ).fallbackToDestructiveMigration(true).build()
     }
 
+
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Initialize the SDK
+        Places.initialize(this, GOOGLE_MAPS_API_KEY)
+
+        // Create a new PlacesClient instance
+        val placesClient = Places.createClient(this)
 
         val repository = PlantRepository(db)
         val viewModelFactory = ViewModelFactory(repository)
@@ -91,16 +120,17 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             PlantSaverTheme {
-                PlantSaver(dataBaseViewModel)
+                PlantSaver(dataBaseViewModel, placesClient)
             }
         }
     }
 }
 
 @Composable
-fun PlantSaver(dataBaseViewModel: DataBaseViewModel) {
+fun PlantSaver(dataBaseViewModel: DataBaseViewModel, placesClient: PlacesClient) {
     val navController = rememberNavController()
     val weatherViewModel = viewModel<WeatherViewModel>()
+    weatherViewModel.placesClient = placesClient
 
     weatherViewModel.getCurrentWeather()
 
@@ -159,13 +189,18 @@ fun PlantSaver(dataBaseViewModel: DataBaseViewModel) {
 fun Weather(weatherViewModel: WeatherViewModel) {
 
     val weatherData by weatherViewModel.weatherData
-/*
-    val singapore = LatLng(1.35, 103.87)
-    val singaporeMarkerState = rememberMarkerState(position = singapore)
-    val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(singapore, 10f)
+    var locationDialog by remember { mutableStateOf(false) }
+
+    when{
+        locationDialog->{
+            LocationDialog(onDismissRequest = {
+                locationDialog = false
+            },
+                weatherViewModel
+            )
+        }
     }
-*/
+
     Scaffold(
 
     ) { innerPadding ->
@@ -174,16 +209,6 @@ fun Weather(weatherViewModel: WeatherViewModel) {
                 .padding(innerPadding)
                 .fillMaxSize(),
         ){
-            /*GoogleMap(
-                modifier = Modifier.fillMaxSize(),
-                cameraPositionState = cameraPositionState
-            ) {
-                Marker(
-                    state = singaporeMarkerState,
-                    title = "Singapore",
-                    snippet = "Marker in Singapore"
-                )
-            }*/
                     Text(
                         text = "Your location",
                         modifier = Modifier
@@ -193,7 +218,10 @@ fun Weather(weatherViewModel: WeatherViewModel) {
                     Text(
                         text = weatherData?.location?.name.toString(),
                         modifier = Modifier
-                            .fillMaxWidth(),
+                            .fillMaxWidth()
+                            .clickable(onClick = {
+                                locationDialog = true
+                            }),
                         style = TextStyle(
                             fontSize = 30.sp
                         ),
@@ -231,12 +259,14 @@ fun Weather(weatherViewModel: WeatherViewModel) {
 fun Plants(dataBaseViewModel: DataBaseViewModel) {
 
     val plants by dataBaseViewModel.plants
+    val wateringHistory by dataBaseViewModel.watering
+    var plantDetail by remember { mutableIntStateOf(-1) }
 
     Scaffold(
         modifier = Modifier
             .fillMaxSize(),
         floatingActionButton = {
-            AddPlant()
+            AddPlant(dataBaseViewModel)
         }
     ) {
         innerPadding->
@@ -244,15 +274,6 @@ fun Plants(dataBaseViewModel: DataBaseViewModel) {
             modifier = Modifier.
             padding(innerPadding)
         ) {
-            Row() {
-                Spacer(Modifier.weight(1f))
-                Text("ID")
-                Spacer(Modifier.weight(1f))
-                Text("Nazwa")
-                Spacer(Modifier.weight(1f))
-                Text("Gatunek")
-                Spacer(Modifier.weight(1f))
-            }
             LazyColumn(
 
             ) {
@@ -260,27 +281,284 @@ fun Plants(dataBaseViewModel: DataBaseViewModel) {
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .clickable(onClick = {
+                                if(plantDetail == it.plantId) {
+                                    plantDetail = -1
+                                } else {
+                                    plantDetail = it.plantId
+                                    dataBaseViewModel.getPlantHistory(it.plantId)
+                                }
+                            })
                     ) {
-                        Spacer(Modifier.weight(1f))
-                        Text(it.plantId.toString())
-                        Spacer(Modifier.weight(1f))
-                        Text(it.plantName)
-                        Spacer(Modifier.weight(1f))
-                        Text(it.plantSpecies)
-                        Spacer(Modifier.weight(1f))
+                        if(it.plantId == plantDetail) {
+                            Column {
+                                Row {
+                                    Text(it.plantName)
+                                }
+                                Row {
+                                    Text(it.plantSpecies)
+                                }
+                                JetpackComposeBasicLineChart(Modifier)
+                            }
+                        } else {
+                            Row {
+                                Text(it.plantName)
+                            }
+                        }
                     }
                 }
             }
         }
     }
-
 }
 
 @Composable
-fun AddPlant() {
-    FloatingActionButton(
-        onClick = {  },
+fun JetpackComposeBasicLineChart(
+    modelProducer: CartesianChartModelProducer,
+    modifier: Modifier = Modifier,
+) {
+    CartesianChartHost(
+        chart =
+            rememberCartesianChart(
+                rememberLineCartesianLayer(),
+                startAxis = VerticalAxis.rememberStart(),
+                bottomAxis = HorizontalAxis.rememberBottom(),
+            ),
+        modelProducer = modelProducer,
+        modifier = modifier,
+    )
+}
+
+@Composable
+fun JetpackComposeBasicLineChart(modifier: Modifier = Modifier) {
+    val modelProducer = remember { CartesianChartModelProducer() }
+    LaunchedEffect(Unit) {
+        modelProducer.runTransaction {
+            // Learn more: https://patrykandpatrick.com/vmml6t.
+            lineSeries { series(13, 8, 7, 12, 0, 1, 15, 14, 0, 11, 6, 12, 0, 11, 12, 11) }
+        }
+    }
+    JetpackComposeBasicLineChart(modelProducer, modifier)
+}
+
+@Composable
+fun LocationDialog(
+    onDismissRequest: () -> Unit,
+    weatherViewModel: WeatherViewModel
+) {
+
+    var text by remember { mutableStateOf("") }
+
+    val cameraPositionState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(LatLng(1.35, 103.87), 15f)
+    }
+
+    val mapUiSettings by remember { mutableStateOf(MapUiSettings()) }
+    //val mapProperties by remember { mutableStateOf(MapProperties(isMyLocationEnabled = true)) }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(weatherViewModel.currentLatLong.value) {
+        cameraPositionState.animate(CameraUpdateFactory.newLatLng(weatherViewModel.currentLatLong.value))
+    }
+
+    LaunchedEffect(cameraPositionState.isMoving) {
+        if (!cameraPositionState.isMoving) {
+            //weatherViewModel.getAddress(cameraPositionState.position.target)
+        }
+    }
+
+    Dialog(
+        onDismissRequest = {
+            onDismissRequest()
+        }
     ) {
-        Icon(painterResource(id = R.drawable.ic_add), "Floating action button.")
+        Box(
+            modifier = Modifier
+                .padding(top=50.dp,bottom=50.dp)
+                .fillMaxSize()
+                ,
+        ) {
+            GoogleMap(modifier = Modifier.fillMaxSize(),
+                cameraPositionState = cameraPositionState,
+                uiSettings = mapUiSettings,
+                onMapClick = {
+                    scope.launch {
+                        cameraPositionState.animate(CameraUpdateFactory.newLatLng(it))
+                    }
+                })
+            Icon(
+                painter = painterResource(id = R.drawable.ic_marker),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(24.dp)
+                    .align(Alignment.Center)
+            )
+
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(8.dp)
+                    .fillMaxWidth(),
+                color = Color.White,
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    AnimatedVisibility(
+                        weatherViewModel.locationAutofill.isNotEmpty(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp)
+                    ) {
+                        LazyColumn(
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(weatherViewModel.locationAutofill) {
+                                Row(modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp)
+                                    .clickable{
+                                        text = it.address
+                                        weatherViewModel.locationAutofill.clear()
+                                        weatherViewModel.getCoordinates(it)
+                                    }) {
+                                    Text(it.address)
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(16.dp))
+                    }
+                    OutlinedTextField(
+                        value = text, onValueChange = {
+                            text = it
+                            weatherViewModel.searchPlaces(it)
+                        }, modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AddPlant(dataBaseViewModel: DataBaseViewModel) {
+
+    var click by remember { mutableStateOf(false) }
+
+    FloatingActionButton(
+        onClick = { click = !click },
+    ) {
+        when {
+            click->{
+                AddPlantDialog(
+                    onDismissRequest = {click = !click},
+                    dataBaseViewModel
+                )
+            }
+            else->{
+                Icon(painterResource(id = R.drawable.ic_add), "Floating action button.")
+            }
+        }
+    }
+}
+
+@Composable
+fun AddPlantDialog(
+    onDismissRequest: () -> Unit,
+    dataBaseViewModel: DataBaseViewModel
+) {
+    var nameText by remember { mutableStateOf("") }
+    var speciesText by remember { mutableStateOf("") }
+    var frequencyText by remember { mutableStateOf("") }
+
+    Dialog(
+        onDismissRequest = {
+            onDismissRequest()
+        }
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            shape = RoundedCornerShape(16.dp),
+        ){
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+            ){
+                Row {
+                    TextField(
+                        value = nameText,
+                        onValueChange = {
+                            nameText = it
+                        },
+                        label = {
+                            Text("Name")
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(0.dp, 0.dp, 10.dp, 0.dp),
+                        colors = TextFieldDefaults.colors(
+                            focusedIndicatorColor = PlantGreen,
+                            unfocusedIndicatorColor = PlantDarkGreen,
+                            disabledIndicatorColor = Color.Transparent
+                        )
+                    )
+                }
+                Row {
+                    TextField(
+                        value = speciesText,
+                        onValueChange = {
+                            speciesText = it
+                        },
+                        label = {
+                            Text("Species")
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(0.dp, 0.dp, 10.dp, 0.dp),
+                        colors = TextFieldDefaults.colors(
+                            focusedIndicatorColor = PlantGreen,
+                            unfocusedIndicatorColor = PlantDarkGreen,
+                            disabledIndicatorColor = Color.Transparent
+                        )
+                    )
+                }
+                Row {
+                    TextField(
+                        value = frequencyText,
+                        onValueChange = {
+                            frequencyText = it
+                        },
+                        label = {
+                            Text("Watering frequency")
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(0.dp, 0.dp, 10.dp, 0.dp),
+                        colors = TextFieldDefaults.colors(
+                            focusedIndicatorColor = PlantGreen,
+                            unfocusedIndicatorColor = PlantDarkGreen,
+                            disabledIndicatorColor = Color.Transparent
+                        )
+                    )
+                }
+                Row {
+                    Button(
+                        onClick = {
+                            dataBaseViewModel.addPlant(nameText.toString(), speciesText.toString(), frequencyText.toInt())
+                            onDismissRequest()
+                        }
+                    ) {
+                        Text("Add plant")
+                    }
+                }
+            }
+        }
     }
 }
