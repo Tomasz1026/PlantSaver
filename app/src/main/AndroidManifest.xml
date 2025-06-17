@@ -19,8 +19,8 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:label="@string/app_name"
-            android:theme="@style/Theme.PlantSaver">
+            android:theme="@style/Theme.App.Starting"> <!-- MOTYW SPLASH SCREENA DLA AKTYWNOŚCI STARTOWEJ -->
+            <!--android:theme="@style/Theme.PlantSaver">-->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

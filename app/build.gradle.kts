@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    id("org.jetbrains.kotlin.plugin.parcelize")
     id("com.google.devtools.ksp")
     id("com.google.android.libraries.mapsplatform.secrets-gradle-plugin")
 }
@@ -12,7 +13,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.plantsaver"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
@@ -121,4 +122,7 @@ dependencies {
 
     //google places api
     implementation("com.google.android.libraries.places:places:3.0.0")
+
+    //splash screen
+    implementation("androidx.core:core-splashscreen:1.0.1")
 }

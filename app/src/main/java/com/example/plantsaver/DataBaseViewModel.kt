@@ -7,16 +7,21 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
 
-
 class DataBaseViewModel(private val repository: PlantRepository) : ViewModel() {
     private val _plants = mutableStateOf<List<Plant>>(emptyList())
-    private val _watering = mutableStateOf<List<Watering>>(emptyList())
+    private val _plantsToWater = mutableStateOf<List<Plant>>(emptyList())
+    private val _lastWatering = mutableStateOf<List<Watering>>(emptyList())
+    private val _userData = mutableStateOf<UserData>(UserData(1, 0.0, 0.0))
     val plants: State<List<Plant>> = _plants
-    val watering: State<List<Watering>> = _watering
+    val plantsToWater: State<List<Plant>> = _plantsToWater
+    val lastWatering: State<List<Watering>> = _lastWatering
+    val userData: State<UserData> = _userData
     val plantId = mutableIntStateOf(0)
 
     init {
+        checkUserData()
         loadPlants()
+        getPlantsToWater()
     }
 
     fun loadPlants() {
@@ -34,14 +39,22 @@ class DataBaseViewModel(private val repository: PlantRepository) : ViewModel() {
         plantSpecies: String,
         plantFrequency: Int
     ) {
-        plantId.intValue += 1
-        addPlant(Plant(plantId.intValue, plantName, plantSpecies, "", plantFrequency, 0))
-        _plants.value += Plant(plantId.intValue, plantName, plantSpecies, "", plantFrequency, 0)
+        viewModelScope.launch {
+            repository.addPlant(plantName, plantSpecies, plantFrequency)
+            loadPlants()
+            getPlantsToWater()
+        }
     }
 
-    fun addPlant(plant: Plant) {
+    fun addPlant(
+        plantName: String,
+        plantSpecies: String,
+        plantDate: Long,
+        plantFrequency: Int
+    ) {
         viewModelScope.launch {
-            repository.addPlant(plant)
+            repository.addPlant(plantName, plantSpecies, plantDate, plantFrequency)
+            loadPlants()
         }
     }
 
@@ -53,7 +66,60 @@ class DataBaseViewModel(private val repository: PlantRepository) : ViewModel() {
 
     fun getPlantHistory(plantId: Int) {
         viewModelScope.launch {
-            _watering.value = repository.getPlantHistory(plantId)
+            _lastWatering.value = repository.getPlantHistory(plantId)
+        }
+    }
+
+    fun getPlantsToWater() {
+        viewModelScope.launch {
+            _plantsToWater.value = repository.getPlantsToWater()
+        }
+    }
+
+    fun addWatering(plantId: Int) {
+        viewModelScope.launch {
+            repository.addWatering(plantId)
+            getPlantsToWater()
+        }
+    }
+
+    fun addWatering(plantId: Int, date: Long) {
+        viewModelScope.launch {
+            repository.addWatering(plantId, date)
+            getPlantsToWater()
+        }
+    }
+
+    fun deleteAllPlant() {
+        viewModelScope.launch {
+            repository.deleteAllPlant()
+        }
+    }
+
+    fun deleteAllWatering() {
+        viewModelScope.launch {
+            repository.deleteAllWatering()
+        }
+    }
+
+    fun deleteAll() {
+        deleteAllWatering()
+        deleteAllPlant()
+    }
+
+    fun checkUserData() {
+        viewModelScope.launch {
+            if(repository.getLastUserLocation().isEmpty()){
+                repository.addUserLocation()
+            }
+
+            _userData.value = repository.getLastUserLocation()[0]
+        }
+    }
+
+    fun updateUserLocation(latitude:Double, longitude:Double) {
+        viewModelScope.launch {
+            repository.updateUserLocation(latitude, longitude)
         }
     }
 }

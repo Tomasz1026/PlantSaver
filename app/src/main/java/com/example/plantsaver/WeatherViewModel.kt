@@ -1,23 +1,22 @@
 package com.example.plantsaver
 
 import android.annotation.SuppressLint
+import android.location.Geocoder
+import android.os.CountDownTimer
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.Priority
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.libraries.places.api.net.FindAutocompletePredictionsRequest
-import com.google.android.libraries.places.api.Places
 import com.google.android.libraries.places.api.model.Place
 import com.google.android.libraries.places.api.net.FetchPlaceRequest
 import com.google.android.libraries.places.api.net.PlacesClient
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 sealed class LocationState {
     object NoPermission: LocationState()
@@ -37,18 +36,33 @@ class WeatherViewModel: ViewModel() {
 
     private val _weatherData = mutableStateOf<WeatherResponse?>(null)
     val weatherData: State<WeatherResponse?> = _weatherData
+    var weatherDataError = mutableStateOf(false)
 
-    val location = mutableStateOf<String?>("Poznan")
+    val textSearch= mutableStateOf<String>("")
+
+    var timer = object: CountDownTimer(0, 0) {
+        override fun onTick(millisUntilFinished: Long) {
+        }
+        override fun onFinish() {
+        }
+    }
 
     var currentLatLong = mutableStateOf(LatLng(0.0, 0.0))
     val locationAutofill = mutableStateListOf<AutocompleteResult>()
-    private var job: Job? = null
 
     lateinit var placesClient: PlacesClient
 
     lateinit var fusedLocationClient: FusedLocationProviderClient
+    lateinit var geoCoder: Geocoder
 
     var locationState = mutableStateOf<LocationState>(LocationState.LocationAvailable(currentLatLong.value))
+
+    private var job: Job? = null
+
+    fun setCurrentLocation(userData: UserData) {
+        println("Location updated inside weatherViewModel")
+        currentLatLong.value = LatLng(userData.userLatitude, userData.userLongitude)
+    }
 
     @SuppressLint("MissingPermission")
     fun getCurrentLocation() {
@@ -104,13 +118,31 @@ class WeatherViewModel: ViewModel() {
             }
     }
 
-    fun getCurrentWeather() {
+    fun getAddress(latLng: LatLng) {
+        viewModelScope.launch {
+            val address = geoCoder.getFromLocation(latLng.latitude, latLng.longitude, 1)
+            textSearch.value = address?.get(0)?.getAddressLine(0).toString()
+        }
+    }
 
+    fun getCurrentWeather() {
+        println("try to get weather data")
         viewModelScope.launch {
             try {
-                _weatherData.value = RetrofitInstance.api.getCurrentWeather(apiKey, "Poznan", "no")
-
+                _weatherData.value = RetrofitInstance.api.getCurrentWeather(apiKey, "${currentLatLong.value.latitude},${currentLatLong.value.longitude}", "no")
+                weatherDataError.value = false
+                timer.cancel()
             } catch(e: Exception) {
+                weatherDataError.value = true
+                timer = object: CountDownTimer(5000, 1000) {
+                    override fun onTick(millisUntilFinished: Long) {
+                        println("tik")
+                    }
+
+                    override fun onFinish() {
+                        getCurrentWeather()
+                    }
+                }.start()
                 println(e)
             }
         }
