@@ -89,7 +89,7 @@ class WeatherViewModel: ViewModel() {
         viewModelScope.launch {
             val address = geoCoder.getFromLocation(latLng.latitude, latLng.longitude, 1)
             textSearch.value = address?.get(0)?.getAddressLine(0).toString()
-
+            currentLatLong.value = latLng
         }
     }
 
