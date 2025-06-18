@@ -890,7 +890,6 @@ fun LocationDialog(
                                             weatherViewModel.textSearch.value = it.address
                                             weatherViewModel.locationAutofill.clear()
                                             weatherViewModel.getCoordinates(it)
-                                            println(weatherViewModel.currentLatLong.value)
                                         }
                                     ) {
                                         Text(it.address)
@@ -971,8 +970,6 @@ fun LocationDialog(
                                             weatherViewModel.textSearch.value = it.address
                                             weatherViewModel.locationAutofill.clear()
                                             weatherViewModel.getCoordinates(it)
-                                            println(weatherViewModel.currentLatLong.value)
-
                                         }) {
                                         Text(it.address)
                                     }
