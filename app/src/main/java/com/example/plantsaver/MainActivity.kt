@@ -249,7 +249,7 @@ fun Weather(
                                     .fillMaxWidth(),
                                 horizontalArrangement = Arrangement.Center
                             ){
-                                InfiniteRotatingLoader()
+                                CircularProgressIndicator()
                             }
                             Spacer(modifier=Modifier.weight(1f))
                         } else -> {
@@ -398,7 +398,7 @@ fun Weather(
                                 .fillMaxWidth(),
                             horizontalArrangement = Arrangement.Center
                         ){
-                            InfiniteRotatingLoader()
+                            CircularProgressIndicator()
                         }
                         Spacer(modifier=Modifier.weight(1f))
                     } else -> {
@@ -1218,37 +1218,5 @@ fun AddPlantDialog(
                 }
             }
         }
-    }
-}
-
-@Composable
-fun InfiniteRotatingLoader(
-    modifier: Modifier = Modifier,
-    color: Color = MaterialTheme.colorScheme.primary
-) {
-    val size = 48.dp
-    val strokeWidth = 4.dp
-
-    val infiniteTransition = rememberInfiniteTransition()
-    val rotation by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        )
-    )
-    Canvas(
-        modifier = modifier
-            .size(size)
-            .rotate(rotation)
-    ) {
-        drawArc(
-            color = color,
-            startAngle = 0f,
-            sweepAngle = 270f,
-            useCenter = false,
-            style = Stroke(width = strokeWidth.toPx(), cap = StrokeCap.Round)
-        )
     }
 }
